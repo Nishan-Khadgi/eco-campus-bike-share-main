@@ -1,14 +1,22 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, User } from 'lucide-react';
+import { ShoppingCart, User, LogOut, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from '@/components/ui/button';
 
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const { cartItems } = useCart();
+  const { currentUser, signOut } = useAuth();
   
   useEffect(() => {
     const handleScroll = () => {
@@ -30,45 +38,61 @@ const Navbar = () => {
         scrolled ? "py-2 glass-bg shadow-sm" : "py-4 bg-transparent"
       )}
     >
-      <div className="container mx-auto px-4 flex items-center justify-between">
-        <Link 
-          to="/" 
-          className="flex items-center transition-all-300 hover:opacity-80"
-        >
-          <img 
-            src="/lovable-uploads/d989f7a3-1b27-4ce2-a62a-96b178e373a4.png" 
-            alt="Campus Bike" 
-            className="h-16 w-auto" 
-          />
-        </Link>
-        
-        <h1 className={cn(
-          "text-2xl font-medium transition-all-300 absolute left-1/2 transform -translate-x-1/2",
-          scrolled ? "opacity-0" : "opacity-100"
-        )}>
-          Campus E-Bike Rental
-        </h1>
-        
-        <div className="flex items-center space-x-4">
-          <Link 
-            to="/cart" 
-            className="relative p-2 rounded-full bg-ecampus-green text-white hover:bg-ecampus-green/90 transition-all-300 hover:scale-105"
-          >
-            <ShoppingCart className="h-5 w-5" />
-            {cartItems.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-black text-white text-xs w-5 h-5 rounded-full flex items-center justify-center animate-fade-in">
-                {cartItems.length}
-              </span>
-            )}
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between">
+          <Link to="/" className="flex items-center">
+            <img 
+              src="/lovable-uploads/8f70293c-7b8c-4305-a502-83b76070d08f.png" 
+              alt="Ecampus Bike" 
+              className="h-8 w-auto" 
+            />
           </Link>
           
-          <Link 
-            to="/login" 
-            className="flex items-center space-x-1 px-4 py-2 rounded-full bg-ecampus-gray hover:bg-ecampus-gray/80 transition-all-300 hover:scale-105"
-          >
-            <span>Log in</span>
-            <User className="h-4 w-4" />
-          </Link>
+          <div className="flex items-center gap-4">
+            {currentUser ? (
+              <>
+                <Link to="/cart" className="relative">
+                  <ShoppingCart className="h-6 w-6" />
+                  {cartItems.length > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-ecampus-green text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {cartItems.length}
+                    </span>
+                  )}
+                </Link>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                      <User className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      <span>{currentUser.email}</span>
+                    </DropdownMenuItem>
+                    <Link to="/rentals">
+                      <DropdownMenuItem className="flex items-center gap-2">
+                        <History className="h-4 w-4" />
+                        <span>My Rentals</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <DropdownMenuItem 
+                      className="flex items-center gap-2 text-red-600"
+                      onClick={signOut}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>Logout</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+              <Link to="/login">
+                <Button variant="ghost">Login</Button>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </header>

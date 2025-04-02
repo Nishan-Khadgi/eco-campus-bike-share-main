@@ -1,34 +1,114 @@
-
 import { useState } from 'react';
-import { ArrowLeft, Mail, Lock, User } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Mail, Lock, User, Loader2 } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Navbar from '@/components/layout/Navbar';
 import { toast } from 'sonner';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signInWithPopup,
+  sendPasswordResetEmail,
+  auth,
+  googleProvider
+} from '@/lib/firebase';
+import { useAuth } from '@/context/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { currentUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [authTab, setAuthTab] = useState('login');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   
-  const handleLogin = (e: React.FormEvent) => {
+  // Redirect if already logged in
+  if (currentUser) {
+    const from = (location.state as any)?.from?.pathname || '/';
+    navigate(from, { replace: true });
+    return null;
+  }
+  
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
-    // In a real app, we would authenticate the user
-    toast.success('Logged in successfully!');
-    navigate('/');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      toast.success('Logged in successfully!');
+      const from = (location.state as any)?.from?.pathname || '/';
+      navigate(from, { replace: true });
+    } catch (error: any) {
+      let errorMessage = 'Failed to login. Please try again.';
+      if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password.';
+      }
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
   
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
-    // In a real app, we would register the user
-    toast.success('Account created successfully!');
-    setAuthTab('login');
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+      toast.success('Account created successfully!');
+      setAuthTab('login');
+    } catch (error: any) {
+      let errorMessage = 'Failed to create account. Please try again.';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'An account already exists with this email.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password should be at least 6 characters.';
+      }
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    try {
+      await signInWithPopup(auth, googleProvider);
+      toast.success('Logged in successfully!');
+      const from = (location.state as any)?.from?.pathname || '/';
+      navigate(from, { replace: true });
+    } catch (error: any) {
+      toast.error('Failed to sign in with Google. Please try again.');
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      toast.error('Please enter your email address.');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast.success('Password reset email sent! Please check your inbox.');
+      setAuthTab('login');
+    } catch (error: any) {
+      toast.error('Failed to send reset email. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   return (
@@ -111,17 +191,59 @@ const Login = () => {
                     </div>
                     
                     <div className="text-sm">
-                      <a href="#" className="text-ecampus-green hover:text-ecampus-green/80">
+                      <button
+                        type="button"
+                        onClick={handleForgotPassword}
+                        className="text-ecampus-green hover:text-ecampus-green/80"
+                        disabled={isLoading}
+                      >
                         Forgot password?
-                      </a>
+                      </button>
                     </div>
                   </div>
                   
                   <Button 
                     type="submit" 
                     className="w-full bg-ecampus-green hover:bg-ecampus-green/90 text-white mt-6"
+                    disabled={isLoading}
                   >
-                    Sign In
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Signing in...
+                      </>
+                    ) : (
+                      'Sign In'
+                    )}
+                  </Button>
+
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleGoogleSignIn}
+                    disabled={isGoogleLoading}
+                  >
+                    {isGoogleLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Signing in with Google...
+                      </>
+                    ) : (
+                      <>
+                        <img src="/google.svg" alt="Google" className="w-5 h-5 mr-2" />
+                        Sign in with Google
+                      </>
+                    )}
                   </Button>
                 </form>
               </TabsContent>
@@ -194,8 +316,16 @@ const Login = () => {
                   <Button 
                     type="submit" 
                     className="w-full bg-ecampus-green hover:bg-ecampus-green/90 text-white mt-6"
+                    disabled={isLoading}
                   >
-                    Create Account
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating account...
+                      </>
+                    ) : (
+                      'Create Account'
+                    )}
                   </Button>
                 </form>
               </TabsContent>
