@@ -18,6 +18,7 @@ interface Rental {
   endTime?: Date;
   status: 'active' | 'completed' | 'cancelled';
   totalPrice: number;
+  rentalHours: number;
 }
 
 const RentalHistory = () => {
@@ -40,7 +41,8 @@ const RentalHistory = () => {
           startTime: rental.startTime.toDate(),
           endTime: rental.endTime?.toDate(),
           status: rental.status,
-          totalPrice: rental.totalPrice
+          totalPrice: rental.totalPrice,
+          rentalHours: rental.rentalHours || 0
         } satisfies Rental));
 
         setActiveRentals(rentals.filter(rental => rental.status === 'active'));
@@ -107,10 +109,7 @@ const RentalHistory = () => {
       <div className="flex justify-between items-center pt-4 border-t">
         <div className="flex items-center gap-2 text-sm">
           <Calendar className="h-4 w-4 text-muted-foreground" />
-          <span>Duration: {rental.endTime 
-            ? `${Math.round((rental.endTime.getTime() - rental.startTime.getTime()) / (1000 * 60))} minutes`
-            : 'Ongoing'
-          }</span>
+          <span>Duration: {rental.rentalHours} hour{rental.rentalHours !== 1 ? 's' : ''}</span>
         </div>
         <span className="font-semibold">${rental.totalPrice.toFixed(2)}</span>
       </div>
