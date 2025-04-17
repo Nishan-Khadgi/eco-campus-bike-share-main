@@ -7,6 +7,11 @@ interface CreateRentalData {
   dropoffLocation: string;
   totalPrice: number;
   userId: string;
+  rentalHours: number;
+  paymentMethod: 'card' | 'dining';
+  paymentId: string;
+  paymentReference: string;
+  status: 'active' | 'completed' | 'cancelled';
 }
 
 interface FirestoreRental {
@@ -19,6 +24,10 @@ interface FirestoreRental {
   status: 'active' | 'completed' | 'cancelled';
   totalPrice: number;
   userId: string;
+  rentalHours: number;
+  paymentMethod: string;
+  paymentId: string;
+  paymentReference: string;
 }
 
 export const createRental = async (rentalData: CreateRentalData) => {
@@ -27,7 +36,7 @@ export const createRental = async (rentalData: CreateRentalData) => {
     const newRental = {
       ...rentalData,
       startTime: Timestamp.now(),
-      status: 'active',
+      endTime: Timestamp.fromMillis(Date.now() + (rentalData.rentalHours * 60 * 60 * 1000)), // Convert hours to milliseconds
     };
 
     const docRef = await addDoc(rentalsRef, newRental);
