@@ -11,7 +11,9 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   sendPasswordResetEmail,
-  User
+  User,
+  browserLocalPersistence,
+  setPersistence
 } from "firebase/auth";
 
 // Your web app's Firebase configuration
@@ -32,6 +34,9 @@ const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
+
+// Initialize auth state persistence
+setPersistence(auth, browserLocalPersistence);
 
 export { auth, app, analytics, googleProvider, db };
 export { 
