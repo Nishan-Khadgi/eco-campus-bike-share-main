@@ -71,6 +71,12 @@ const Navbar = () => {
                       <User className="h-4 w-4" />
                       <span>{currentUser.email}</span>
                     </DropdownMenuItem>
+                    <Link to="/profile">
+                      <DropdownMenuItem className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        <span>Profile</span>
+                      </DropdownMenuItem>
+                    </Link>
                     <Link to="/rentals">
                       <DropdownMenuItem className="flex items-center gap-2">
                         <History className="h-4 w-4" />

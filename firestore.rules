@@ -7,27 +7,19 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper function to check if the user is accessing their own data
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
     // Rentals collection rules
     match /rentals/{rentalId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() 
         && request.resource.data.userId == request.auth.uid;
-      allow update: if isOwner(resource.data.userId);
-      allow delete: if false; // Prevent deletions
+      allow update: if isAuthenticated() 
+        && request.resource.data.userId == resource.data.userId;
+      allow delete: if isAuthenticated();
     }
 
-    // Payments collection rules
-    match /payments/{paymentId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() 
-        && request.resource.data.metadata.userId == request.auth.uid;
-      allow update: if false; // Prevent updates
-      allow delete: if false; // Prevent deletions
+    // Default rule for other collections
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
     }
   }
 }

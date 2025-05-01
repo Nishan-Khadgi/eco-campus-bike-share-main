@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Clock, MapPin, Calendar, Plus } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, Calendar, Plus, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Navbar from '@/components/layout/Navbar';
 import { useAuth } from '@/context/AuthContext';
-import { getUserRentals } from '@/lib/services/rentalService';
+import { getUserRentals, updateRental, deleteRental } from '@/lib/services/rentalService';
 import AddRentalForm from '@/components/rental/AddRentalForm';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 
 interface Rental {
   id: string;
@@ -26,6 +30,17 @@ const RentalHistory = () => {
   const [activeRentals, setActiveRentals] = useState<Rental[]>([]);
   const [pastRentals, setPastRentals] = useState<Rental[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingRental, setEditingRental] = useState<Rental | null>(null);
+  const [deletingRental, setDeletingRental] = useState<Rental | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    pickupLocation: '',
+    dropoffLocation: '',
+    rentalHours: ''
+  });
+
+  const isRentalActive = (rental: Rental) => {
+    return rental.status === 'active' && (!rental.endTime || new Date() <= rental.endTime);
+  };
 
   const fetchRentals = async () => {
     if (!currentUser) return;
@@ -38,18 +53,20 @@ const RentalHistory = () => {
           bikeName: rental.bikeName,
           pickupLocation: rental.pickupLocation,
           dropoffLocation: rental.dropoffLocation,
-          startTime: rental.startTime.toDate(),
-          endTime: rental.endTime?.toDate(),
+          startTime: rental.startTime,
+          endTime: rental.endTime,
           status: rental.status,
           totalPrice: rental.totalPrice,
           rentalHours: rental.rentalHours || 0
         } satisfies Rental));
 
-        setActiveRentals(rentals.filter(rental => rental.status === 'active'));
-        setPastRentals(rentals.filter(rental => rental.status === 'completed'));
+        // Filter rentals based on both status and end time
+        setActiveRentals(rentals.filter(isRentalActive));
+        setPastRentals(rentals.filter(rental => !isRentalActive(rental)));
       }
     } catch (error) {
       console.error('Error fetching rentals:', error);
+      toast.error('Failed to fetch rentals');
     } finally {
       setLoading(false);
     }
@@ -58,6 +75,60 @@ const RentalHistory = () => {
   useEffect(() => {
     fetchRentals();
   }, [currentUser]);
+
+  const handleUpdateRental = async (rentalId: string) => {
+    if (!editingRental) return;
+
+    try {
+      const result = await updateRental(rentalId, {
+        pickupLocation: editFormData.pickupLocation,
+        dropoffLocation: editFormData.dropoffLocation,
+        rentalHours: Number(editFormData.rentalHours)
+      });
+
+      if (result.success) {
+        toast.success('Rental updated successfully');
+        setEditingRental(null);
+        fetchRentals();
+      } else {
+        throw new Error('Failed to update rental');
+      }
+    } catch (error) {
+      toast.error('Failed to update rental');
+    }
+  };
+
+  const handleDeleteRental = async (rentalId: string) => {
+    if (!rentalId || !currentUser) {
+      toast.error('You must be logged in to delete a rental');
+      return;
+    }
+
+    try {
+      const result = await deleteRental(rentalId);
+      
+      if (result.success) {
+        toast.success('Rental deleted successfully');
+        setDeletingRental(null);
+        fetchRentals();
+      } else {
+        const errorMessage = result.error?.message || 'Failed to delete rental';
+        const errorCode = result.error?.code || 'unknown';
+        
+        if (errorCode === 'permission-denied' || errorMessage.includes('permission')) {
+          toast.error('You do not have permission to delete this rental');
+        } else if (errorCode === 'not-found' || errorMessage.includes('not found')) {
+          toast.error('Rental not found');
+          setDeletingRental(null);
+          fetchRentals();
+        } else {
+          toast.error(errorMessage);
+        }
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred while deleting the rental');
+    }
+  };
 
   const RentalCard = ({ rental }: { rental: Rental }) => (
     <div className="bg-white rounded-lg shadow-sm border border-border p-6 space-y-4">
@@ -74,13 +145,46 @@ const RentalHistory = () => {
             })}
           </p>
         </div>
-        <span className={`px-3 py-1 rounded-full text-sm ${
-          rental.status === 'active' 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-gray-100 text-gray-800'
-        }`}>
-          {rental.status === 'active' ? 'Active' : 'Completed'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`px-3 py-1 rounded-full text-sm ${
+            isRentalActive(rental)
+              ? 'bg-green-100 text-green-800' 
+              : 'bg-gray-100 text-gray-800'
+          }`}>
+            {isRentalActive(rental) ? 'Active' : 'Completed'}
+          </span>
+          {isRentalActive(rental) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => {
+                    setEditingRental(rental);
+                    setEditFormData({
+                      pickupLocation: rental.pickupLocation,
+                      dropoffLocation: rental.dropoffLocation,
+                      rentalHours: rental.rentalHours.toString()
+                    });
+                  }}
+                >
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-red-600"
+                  onClick={() => setDeletingRental(rental)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -190,6 +294,84 @@ const RentalHistory = () => {
               )}
             </TabsContent>
           </Tabs>
+
+          {/* Edit Rental Dialog */}
+          <Dialog open={!!editingRental} onOpenChange={(open) => !open && setEditingRental(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Rental</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="pickupLocation">Pickup Location</Label>
+                  <Input
+                    id="pickupLocation"
+                    value={editFormData.pickupLocation}
+                    onChange={(e) => setEditFormData(prev => ({
+                      ...prev,
+                      pickupLocation: e.target.value
+                    }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="dropoffLocation">Dropoff Location</Label>
+                  <Input
+                    id="dropoffLocation"
+                    value={editFormData.dropoffLocation}
+                    onChange={(e) => setEditFormData(prev => ({
+                      ...prev,
+                      dropoffLocation: e.target.value
+                    }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="rentalHours">Rental Hours</Label>
+                  <Input
+                    id="rentalHours"
+                    type="number"
+                    min="1"
+                    value={editFormData.rentalHours}
+                    onChange={(e) => setEditFormData(prev => ({
+                      ...prev,
+                      rentalHours: e.target.value
+                    }))}
+                  />
+                </div>
+                <Button
+                  className="w-full bg-ecampus-green hover:bg-ecampus-green/90"
+                  onClick={() => editingRental && handleUpdateRental(editingRental.id)}
+                >
+                  Update Rental
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Confirmation Dialog */}
+          <Dialog open={!!deletingRental} onOpenChange={(open) => !open && setDeletingRental(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete Rental</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete this rental? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setDeletingRental(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => deletingRental && handleDeleteRental(deletingRental.id)}
+                >
+                  Delete
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>
